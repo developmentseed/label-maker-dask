@@ -36,11 +36,11 @@ class LabelMakerJob:
 
     def build_job(self):
         """create task list for labels and images"""
-        tile_list = tiles(self.bounds, [self.zoom])
-        label_tups = [self.label(tile) for tile in tile_list]
+        self.tile_list = list(tiles(*self.bounds, [self.zoom]))
+        label_tups = [self.label(tile) for tile in self.tile_list]
         self.tasks = [self.get_image(tup) for tup in label_tups]
         print("Sample graph")
-        dask.visualize(self.results[:3])
+        return dask.visualize(self.tasks[:3])
 
     def n_tiles(self):
         """return the number of tiles for a built job"""
