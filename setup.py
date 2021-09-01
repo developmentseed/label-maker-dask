@@ -1,6 +1,6 @@
 """Setup for label-maker-dask"""
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 with open("README.md") as f:
     readme = f.read()
@@ -40,6 +40,7 @@ setup(
     author_email="drew@developmentseed.org",
     url="https://github.com/developmentseed/label-maker-dask",
     license="BSD",
+    packages=find_packages(exclude=["tests*"]),
     zip_safe=False,
     install_requires=inst_reqs,
     extras_require=extra_reqs,
