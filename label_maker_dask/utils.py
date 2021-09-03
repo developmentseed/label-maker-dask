@@ -42,14 +42,14 @@ def class_match(ml_type, label, i):
     return None
 
 
-def download_tile_tms(tile: Tile, imagery, kwargs):
+def download_tile_tms(tile: Tile, imagery):
     """Download a satellite image tile from a tms endpoint"""
 
     if os.environ.get("ACCESS_TOKEN"):
         token = os.environ.get("ACCESS_TOKEN")
         imagery = imagery.format_map(SafeDict(ACCESS_TOKEN=token))
 
-    r = requests.get(url(tile, imagery), auth=kwargs.get("http_auth"))
+    r = requests.get(url(tile, imagery))
 
     return np.array(Image.open(BytesIO(r.content)))
 
@@ -64,7 +64,7 @@ def get_tile_tif(tile, imagery):
     return img
 
 
-def get_tile_wms(tile, imagery, kwargs):
+def get_tile_wms(tile, imagery):
     """
     Read a WMS endpoint with query parameters corresponding to a TMS tile
 
@@ -92,7 +92,7 @@ def get_tile_wms(tile, imagery, kwargs):
 
     # request the image with the transformed bounding box and save
     wms_url = imagery.replace("{bbox}", ",".join([str(b) for b in bbox]))
-    r = requests.get(wms_url, auth=kwargs.get("http_auth"))
+    r = requests.get(wms_url)
 
     return np.array(Image.open(BytesIO(r.content)))
 
