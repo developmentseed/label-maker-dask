@@ -14,7 +14,7 @@ inst_reqs = [
     "Pillow",
     "rasterio",
     "requests",
-    "rio-cogeo",
+    "rio-tiler",
 ]
 
 extra_reqs = {
