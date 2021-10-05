@@ -75,7 +75,7 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
         transform = Affine(resolution, 0, w, 0, -resolution, n)
 
         label = rasterize(geos, out_shape=(256, 256), transform=transform)
-    except KeyError:
+    except (KeyError, ValueError):
         print(f"failed reading QA tile: {url}")
         label = np.zeros((256, 256))
 
