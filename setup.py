@@ -8,13 +8,14 @@ with open("README.md") as f:
 # Runtime requirements.
 inst_reqs = [
     "dask",
-    "fiona",
+    "mapbox-vector-tile",
     "mercantile",
     "numpy",
     "Pillow",
     "rasterio",
     "requests",
     "rio-tiler",
+    "shapely",
 ]
 
 extra_reqs = {

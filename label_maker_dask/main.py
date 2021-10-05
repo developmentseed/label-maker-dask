@@ -1,18 +1,50 @@
 """Create machine learning training data from satellite imagery and OpenStreetMap"""
-import json
 from typing import Any, Dict, List
 
 import dask
-import fiona
+import mapbox_vector_tile
 import numpy as np
-from mercantile import bounds, tiles
+import requests  # type: ignore
+from affine import Affine
+from mercantile import Tile, tiles, ul
+from PIL import Image
+from rasterio.features import rasterize
+from shapely.errors import TopologicalError
+from shapely.geometry import Polygon, mapping, shape
 
 from label_maker_dask.filter import create_filter
-from label_maker_dask.utils import get_image_function
+from label_maker_dask.utils import (
+    EXTENT,
+    class_color,
+    degrees_per_pixel,
+    get_image_function,
+    project_feat,
+)
+
+
+class Result:
+    """TODO: params, return; class for label results"""
+
+    def __init__(self, tile: Tile, label: np.array, image: np.array):
+        """initialize new result"""
+        self.tile = tile
+        self.label = label
+        self.image = image
+
+    def show(self):
+        """show result"""
+        visible_label = np.array(
+            [class_color(label_class) for label_class in np.nditer(self.label)]
+        ).reshape(256, 256, 3)
+        return (
+            self.tile,
+            Image.fromarray(visible_label.astype(np.uint8)),
+            Image.fromarray(self.image.astype(np.uint8)),
+        )
 
 
 class LabelMakerJob:
-    """TODO: class for creating label maker dask job"""
+    """TODO: params, return; class for creating label maker dask job"""
 
     def __init__(
         self,
@@ -37,7 +69,7 @@ class LabelMakerJob:
     def build_job(self):
         """create task list for labels and images"""
         self.tile_list = list(tiles(*self.bounds, [self.zoom]))
-        label_tups = [self.label(tile) for tile in self.tile_list]
+        label_tups = [self.tile_to_label(tile) for tile in self.tile_list]
         self.tasks = [self.get_image(tup) for tup in label_tups]
         print("Sample graph")
         return dask.visualize(self.tasks[:3])
@@ -55,7 +87,7 @@ class LabelMakerJob:
         self.results = dask.compute(*self.tasks)
 
     @dask.delayed
-    def label(self, tile):
+    def tile_to_label(self, tile):
         """
         Parameters
         ------------
@@ -71,37 +103,46 @@ class LabelMakerJob:
         """
         ml_type = self.ml_type  # noqa: F841
         classes = self.classes
-        label_source = self.label_source
 
-        tile_bounds = bounds(tile)
-        features = []
+        url = self.label_source.format(x=tile.x, y=tile.y, z=tile.z)
+        r = requests.get(url)
+        r.raise_for_status()
 
-        with fiona.open(label_source, "r") as src:
-            for f in src.filter(
-                bbox=(
-                    tile_bounds.west,
-                    tile_bounds.south,
-                    tile_bounds.east,
-                    tile_bounds.north,
-                )
-            ):
-                f["properties"] = json.loads(f["properties"]["json"])
-                features.append(f)
+        tile_data = mapbox_vector_tile.decode(r.content)
+        features = [
+            project_feat(feat, tile.x, tile.y, tile.z, EXTENT)
+            for feat in tile_data["osm"]["features"]
+            if "Multi" not in feat["geometry"]["type"]
+        ]
 
-        # if ml_type == 'classification':
-        class_counts = np.zeros(len(classes) + 1, dtype=np.int32)
-        for i, cl in enumerate(classes):
-            ff = create_filter(cl.get("filter"))
-            class_counts[i + 1] = int(bool([f for f in features if ff(f)]))
-        # if there are no classes, activate the background
-        if np.sum(class_counts) == 0:
-            class_counts[0] = 1
+        clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
+        geos = []
+        for feat in features:
+            for i, cl in enumerate(classes):
+                ff = create_filter(cl.get("filter"))
+                if ff(feat):
+                    geo = shape(feat["geometry"])
+                    try:
+                        geo = geo.intersection(clip_mask)
+                    except TopologicalError as e:
+                        print(e, "skipping")
+                        break
+                    if cl.get("buffer"):
+                        geo = geo.buffer(cl.get("buffer"), 4)
+                    if not geo.is_empty:
+                        geos.append((mapping(geo), i + 1))
 
-        return (tile, class_counts)
+        w, n = ul(tile.x, tile.y, tile.z)
+        resolution = degrees_per_pixel(tile.z, 0)
+        transform = Affine(resolution, 0, w, 0, -resolution, n)
+
+        label = rasterize(geos, out_shape=(256, 256), transform=transform)
+
+        return (tile, label)
 
     @dask.delayed
     def get_image(self, tup):
         """fetch images"""
         tile, label = tup
         image_function = get_image_function(self.imagery)
-        return image_function(tile, self.imagery)
+        return Result(tile, label, image_function(tile, self.imagery))
