@@ -28,9 +28,7 @@ class SafeDict(dict):
 
 def url(tile: Tile, imagery):
     """Return a tile url provided an imagery template and a tile"""
-    return (
-        imagery.replace("{x}", tile[0]).replace("{y}", tile[1]).replace("{z}", tile[2])
-    )
+    return imagery.format(x=tile.x, y=tile.y, z=tile.z)
 
 
 def class_match(ml_type, label, i):
