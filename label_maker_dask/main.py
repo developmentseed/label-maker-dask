@@ -6,11 +6,11 @@ import mapbox_vector_tile
 import numpy as np
 import requests  # type: ignore
 from affine import Affine
-from mercantile import Tile, tiles, ul
+from mercantile import Tile, feature, tiles, ul
 from PIL import Image
 from rasterio.features import rasterize
 from shapely.errors import TopologicalError
-from shapely.geometry import Polygon, mapping, shape
+from shapely.geometry import mapping, shape
 
 from label_maker_dask.filter import create_filter
 from label_maker_dask.utils import (
@@ -53,7 +53,7 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
             if "Multi" not in feat["geometry"]["type"]
         ]
 
-        clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
+        clip_mask = shape(feature(tile)["geometry"])
         geos = []
         for feat in features:
             for i, cl in enumerate(classes):
