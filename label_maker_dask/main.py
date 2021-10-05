@@ -99,16 +99,17 @@ class Result:
         self.label = label
         self.image = image
 
-    def show(self):
-        """show result"""
+    def show_label(self):
+        """show label"""
         visible_label = np.array(
             [class_color(label_class) for label_class in np.nditer(self.label)]
         ).reshape(256, 256, 3)
-        return (
-            self.tile,
-            Image.fromarray(visible_label.astype(np.uint8)),
-            Image.fromarray(self.image.astype(np.uint8)),
-        )
+
+        return Image.fromarray(visible_label.astype(np.uint8))
+
+    def show_image(self):
+        """show image"""
+        return Image.fromarray(self.image.astype(np.uint8))
 
 
 class LabelMakerJob:
