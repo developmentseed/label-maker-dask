@@ -52,32 +52,32 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
             for feat in tile_data["osm"]["features"]
             if "Multi" not in feat["geometry"]["type"]
         ]
+
+        clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
+        geos = []
+        for feat in features:
+            for i, cl in enumerate(classes):
+                ff = create_filter(cl.get("filter"))
+                if ff(feat):
+                    geo = shape(feat["geometry"])
+                    try:
+                        geo = geo.intersection(clip_mask)
+                    except TopologicalError as e:
+                        print(e, "skipping")
+                        break
+                    if cl.get("buffer"):
+                        geo = geo.buffer(cl.get("buffer"), 4)
+                    if not geo.is_empty:
+                        geos.append((mapping(geo), i + 1))
+
+        w, n = ul(tile.x, tile.y, tile.z)
+        resolution = degrees_per_pixel(tile.z, 0)
+        transform = Affine(resolution, 0, w, 0, -resolution, n)
+
+        label = rasterize(geos, out_shape=(256, 256), transform=transform)
     except KeyError:
         print(f"failed reading QA tile: {url}")
-        features = []
-
-    clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
-    geos = []
-    for feat in features:
-        for i, cl in enumerate(classes):
-            ff = create_filter(cl.get("filter"))
-            if ff(feat):
-                geo = shape(feat["geometry"])
-                try:
-                    geo = geo.intersection(clip_mask)
-                except TopologicalError as e:
-                    print(e, "skipping")
-                    break
-                if cl.get("buffer"):
-                    geo = geo.buffer(cl.get("buffer"), 4)
-                if not geo.is_empty:
-                    geos.append((mapping(geo), i + 1))
-
-    w, n = ul(tile.x, tile.y, tile.z)
-    resolution = degrees_per_pixel(tile.z, 0)
-    transform = Affine(resolution, 0, w, 0, -resolution, n)
-
-    label = rasterize(geos, out_shape=(256, 256), transform=transform)
+        label = np.zeros((256, 256))
 
     return (tile, label)
 
