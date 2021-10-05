@@ -46,11 +46,15 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
     r.raise_for_status()
 
     tile_data = mapbox_vector_tile.decode(r.content)
-    features = [
-        project_feat(feat, tile.x, tile.y, tile.z, EXTENT)
-        for feat in tile_data["osm"]["features"]
-        if "Multi" not in feat["geometry"]["type"]
-    ]
+    try:
+        features = [
+            project_feat(feat, tile.x, tile.y, tile.z, EXTENT)
+            for feat in tile_data["osm"]["features"]
+            if "Multi" not in feat["geometry"]["type"]
+        ]
+    except KeyError:
+        print(f"failed reading QA tile: {url}")
+        features = []
 
     clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
     geos = []
