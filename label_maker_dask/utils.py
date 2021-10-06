@@ -61,7 +61,7 @@ def get_tile_tif(tile, imagery):
     with COGReader(imagery) as image:
         img = image.tile(*tile)
 
-    return img
+    return img.data
 
 
 def get_tile_wms(tile, imagery):

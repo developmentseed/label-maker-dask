@@ -1,4 +1,6 @@
 """Create machine learning training data from satellite imagery and OpenStreetMap"""
+import base64
+from io import BytesIO
 from typing import Any, Dict, List
 
 import dask
@@ -110,6 +112,20 @@ class Result:
     def show_image(self):
         """show image"""
         return Image.fromarray(self.image.astype(np.uint8))
+
+    def get_html(self):
+        """show custom HTML card"""
+        labelio = BytesIO()
+        self.show_label().save(labelio, format="JPEG")
+        label_str = base64.b64encode(labelio.getvalue()).decode("utf-8")
+
+        imageio = BytesIO()
+        self.show_image().save(imageio, format="JPEG")
+        image_str = base64.b64encode(imageio.getvalue()).decode("utf-8")
+
+        elem = f"<div style='border-radius:5px;background-color:#eee;padding:2em;><span>{self.tile}</span><img style='display:inline-block;vertical-align:middle;margin-left:1em;' src='data:image/jpeg;base64,{label_str}'/><img style='display:inline-block;vertical-align:middle;margin-left:1em;' src='data:image/jpeg;base64,{image_str}'/></div>"
+
+        return elem
 
 
 class LabelMakerJob:
