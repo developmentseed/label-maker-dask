@@ -7,21 +7,14 @@ import dask
 import mapbox_vector_tile
 import numpy as np
 import requests  # type: ignore
-from affine import Affine
-from mercantile import Tile, feature, tiles, ul
+from mercantile import Tile, tiles
 from PIL import Image
 from rasterio.features import rasterize
 from shapely.errors import TopologicalError
-from shapely.geometry import mapping, shape
+from shapely.geometry import Polygon, mapping, shape
 
 from label_maker_dask.filter import create_filter
-from label_maker_dask.utils import (
-    EXTENT,
-    class_color,
-    degrees_per_pixel,
-    get_image_function,
-    project_feat,
-)
+from label_maker_dask.utils import class_color, get_image_function
 
 
 # delayed functions
@@ -49,18 +42,16 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
 
     tile_data = mapbox_vector_tile.decode(r.content)
     try:
-        features = [
-            project_feat(feat, tile.x, tile.y, tile.z, EXTENT)
-            for feat in tile_data["osm"]["features"]
-            if "Multi" not in feat["geometry"]["type"]
-        ]
-
-        clip_mask = shape(feature(tile)["geometry"])
+        features = tile_data["osm"]["features"]
+        clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
         geos = []
         for feat in features:
             for i, cl in enumerate(classes):
                 ff = create_filter(cl.get("filter"))
                 if ff(feat):
+                    feat["geometry"]["coordinates"] = _convert_coordinates(
+                        feat["geometry"]["coordinates"]
+                    )
                     geo = shape(feat["geometry"])
                     try:
                         geo = geo.intersection(clip_mask)
@@ -72,11 +63,7 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
                     if not geo.is_empty:
                         geos.append((mapping(geo), i + 1))
 
-        w, n = ul(tile.x, tile.y, tile.z)
-        resolution = degrees_per_pixel(tile.z, 0)
-        transform = Affine(resolution, 0, w, 0, -resolution, n)
-
-        label = rasterize(geos, out_shape=(256, 256), transform=transform)
+        label = rasterize(geos, out_shape=(256, 256))
     except (KeyError, ValueError):
         print(f"failed reading QA tile: {url}")
         label = np.zeros((256, 256))
@@ -171,3 +158,42 @@ class LabelMakerJob:
     def execute_job(self):
         """compute the labels and images"""
         self.results = dask.compute(*self.tasks)
+
+
+def _convert_coordinates(coords):
+    # for points, return the coordinates converted
+    if isinstance(coords[0], int):
+        return list(map(_pixel_bounds_convert, enumerate(coords)))
+    # for other geometries, recurse
+    return list(map(_convert_coordinates, coords))
+
+
+def _pixel_bbox(bb):
+    """Convert a bounding box in 0-4096 to pixel coordinates"""
+    # this will have coordinates in xmin, ymin, xmax, ymax order
+    # because we flip the yaxis, we also need to reorder
+    converted = list(
+        map(_pixel_bounds_convert, enumerate([bb[0], bb[3], bb[2], bb[1]]))
+    )
+    return _buffer_bbox(converted)
+
+
+def _buffer_bbox(bb, buffer=4):
+    """Buffer a bounding box in pixel coordinates"""
+    return list(
+        map(_clamp, [bb[0] - buffer, bb[1] - buffer, bb[2] + buffer, bb[3] + buffer])
+    )
+
+
+def _clamp(coordinate):
+    """restrict a single coordinate to 0-255"""
+    return max(0, min(255, coordinate))
+
+
+def _pixel_bounds_convert(x):
+    """Convert a single 0-4096 coordinate to a pixel coordinate"""
+    (i, b) = x
+    # input bounds are in the range 0-4096 by default: https://github.com/tilezen/mapbox-vector-tile
+    # we want them to match our fixed imagery size of 256
+    pixel = round(b * 255.0 / 4096)  # convert to tile pixels
+    return pixel if (i % 2 == 0) else 255 - pixel  # flip the y axis

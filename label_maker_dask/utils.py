@@ -1,6 +1,5 @@
 # pylint: disable=unused-argument
 """Provide utility functions"""
-import math
 import os
 from io import BytesIO
 from urllib.parse import parse_qs
@@ -15,7 +14,6 @@ from rasterio.warp import transform_bounds
 from rio_tiler.io import COGReader
 
 WGS84_CRS = CRS.from_epsg(4326)
-EXTENT = 4096 * 256
 
 
 class SafeDict(dict):
@@ -129,22 +127,6 @@ def get_image_function(imagery):
     return download_tile_tms
 
 
-def degrees_per_pixel(zoom, lat):
-    """
-    Return the degree resolution for a given mercator tile zoom and lattitude.
-    Parameters
-    ----------
-    zoom: int
-        Mercator zoom level
-    lat: float
-        Latitude in decimal degree
-    Returns
-    -------
-    Pixel resolution in degrees
-    """
-    return (math.cos(lat * math.pi / 180.0)) / (256 * 2 ** zoom)
-
-
 # Taken from https://github.com/CartoDB/CartoColor/blob/master/cartocolor.js#L1633-L1733
 colors = ["#DDCC77", "#CC6677", "#117733", "#332288", "#AA4499", "#88CCEE"]
 
@@ -154,40 +136,3 @@ def class_color(c):
     if c == 0:
         return (0, 0, 0)  # background class
     return ImageColor.getrgb(colors[c % len(colors)])
-
-
-def to_lonlat(tile_x, tile_y, tile_zoom, tile_extent, x, y):
-    """convert qa tile to lon lat"""
-    n_cells_side = 2 ** tile_zoom * tile_extent
-    x_normalized = (x + tile_x * tile_extent) / n_cells_side - 0.5
-    lon = x_normalized * 360.0
-    y_normalized = 0.5 - (y + tile_y * tile_extent) / n_cells_side
-    lat = math.degrees(math.atan(math.sinh(2 * math.pi * y_normalized)))
-    return lon, lat
-
-
-def project_feat(feat, tx, ty, tz, extent):
-    """project feature"""
-    geom = feat["geometry"]
-    if geom["type"] == "Polygon":
-        geom = {
-            "type": geom["type"],
-            "coordinates": [
-                [to_lonlat(tx, ty, tz, extent, *coords) for coords in part]
-                for part in geom["coordinates"]
-            ],
-        }
-    elif geom["type"] == "LineString":
-        geom = {
-            "type": geom["type"],
-            "coordinates": [
-                to_lonlat(tx, ty, tz, extent, *coords) for coords in geom["coordinates"]
-            ],
-        }
-    elif geom["type"] == "Point":
-        geom = {
-            "type": geom["type"],
-            "coordinates": to_lonlat(tx, ty, tz, extent, *geom["coordinates"]),
-        }
-    feat["geometry"] = geom
-    return feat
