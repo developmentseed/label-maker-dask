@@ -36,5 +36,5 @@ lmj.execute_job()
 View or otherwise use the results (by passing to a machine learning framework)
 ```python
 for result in lmj.results:
-    result.show()
+    ...
 ```

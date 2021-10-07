@@ -7,50 +7,55 @@ from shapely.geometry import Polygon, mapping, shape
 from label_maker_dask.filter import create_filter
 
 
-def get_label(features, classes, ml_type):
+def get_label(tile_data, classes, ml_type):
     """return label for a set of features, classes, and ml_type"""
-    clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
-    if ml_type == "classification":
-        class_counts = np.zeros(len(classes) + 1, dtype=np.int)
-        for i, cl in enumerate(classes):
-            ff = create_filter(cl.get("filter"))
-            class_counts[i + 1] = int(bool([f for f in features if ff(f)]))
-        # if there are no classes, activate the background
-        if np.sum(class_counts) == 0:
-            class_counts[0] = 1
-        return class_counts
-    elif ml_type == "object-detection":
-        bboxes = _create_empty_label(ml_type, classes)
-        for feat in features:
+    try:
+        features = tile_data["osm"]["features"]
+        clip_mask = Polygon(((0, 0), (0, 255), (255, 255), (255, 0), (0, 0)))
+        if ml_type == "classification":
+            class_counts = np.zeros(len(classes) + 1, dtype=np.int)
             for i, cl in enumerate(classes):
                 ff = create_filter(cl.get("filter"))
-                if ff(feat):
-                    geo = shape(feat["geometry"])
-                    if cl.get("buffer"):
-                        geo = geo.buffer(cl.get("buffer"), 4)
-                    bb = _pixel_bbox(geo.bounds) + [i + 1]
-                    bboxes = np.append(bboxes, np.array([bb]), axis=0)
-        return bboxes
-    elif ml_type == "segmentation":
-        geos = []
-        for feat in features:
-            for i, cl in enumerate(classes):
-                ff = create_filter(cl.get("filter"))
-                if ff(feat):
-                    feat["geometry"]["coordinates"] = _convert_coordinates(
-                        feat["geometry"]["coordinates"]
-                    )
-                    geo = shape(feat["geometry"])
-                    try:
-                        geo = geo.intersection(clip_mask)
-                    except TopologicalError as e:
-                        print(e, "skipping")
-                        break
-                    if cl.get("buffer"):
-                        geo = geo.buffer(cl.get("buffer"), 4)
-                    if not geo.is_empty:
-                        geos.append((mapping(geo), i + 1))
-        return rasterize(geos, out_shape=(256, 256))
+                class_counts[i + 1] = int(bool([f for f in features if ff(f)]))
+            # if there are no classes, activate the background
+            if np.sum(class_counts) == 0:
+                class_counts[0] = 1
+            return class_counts
+        elif ml_type == "object-detection":
+            bboxes = _create_empty_label(ml_type, classes)
+            for feat in features:
+                for i, cl in enumerate(classes):
+                    ff = create_filter(cl.get("filter"))
+                    if ff(feat):
+                        geo = shape(feat["geometry"])
+                        if cl.get("buffer"):
+                            geo = geo.buffer(cl.get("buffer"), 4)
+                        bb = _pixel_bbox(geo.bounds) + [i + 1]
+                        bboxes = np.append(bboxes, np.array([bb]), axis=0)
+            return bboxes
+        elif ml_type == "segmentation":
+            geos = []
+            for feat in features:
+                for i, cl in enumerate(classes):
+                    ff = create_filter(cl.get("filter"))
+                    if ff(feat):
+                        feat["geometry"]["coordinates"] = _convert_coordinates(
+                            feat["geometry"]["coordinates"]
+                        )
+                        geo = shape(feat["geometry"])
+                        try:
+                            geo = geo.intersection(clip_mask)
+                        except TopologicalError as e:
+                            print(e, "skipping")
+                            break
+                        if cl.get("buffer"):
+                            geo = geo.buffer(cl.get("buffer"), 4)
+                        if not geo.is_empty:
+                            geos.append((mapping(geo), i + 1))
+            return rasterize(geos, out_shape=(256, 256))
+    except (KeyError, ValueError):
+        print("failed writing label for QA tile")
+        return _create_empty_label(ml_type, classes)
 
 
 def _convert_coordinates(coords):
