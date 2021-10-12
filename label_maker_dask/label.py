@@ -45,8 +45,7 @@ def get_label(tile_data, classes, ml_type):
                         geo = shape(feat["geometry"])
                         try:
                             geo = geo.intersection(clip_mask)
-                        except TopologicalError as e:
-                            print(e, "skipping")
+                        except TopologicalError:
                             break
                         if cl.get("buffer"):
                             geo = geo.buffer(cl.get("buffer"), 4)
