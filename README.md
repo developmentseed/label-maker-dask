@@ -16,7 +16,7 @@ Create a label maker job
 from label_maker_dask import LabelMakerJob
 lmj = LabelMakerJob(
     zoom=13,
-    bounds=[-44.4836425781, -23.02665962797, -43.412719726, -22.58563990165],
+    bounds=[-44.4836425781, -23.02665962797, -43.412719726, -22.5856399016],
     classes=[
         { "name": "Roads", "filter": ["has", "highway"] },
         { "name": "Buildings", "filter": ["has", "building"] }
