@@ -14,7 +14,7 @@ inst_reqs = [
     "Pillow",
     "rasterio",
     "requests",
-    "rio-tiler",
+    "rio-tiler>=2",
     "shapely",
 ]
 
@@ -24,7 +24,7 @@ extra_reqs = {
 
 setup(
     name="label-maker-dask",
-    version="0.1.0",
+    version="0.1.1",
     python_requires=">=3.6",
     description="Run label maker as a dask job",
     long_description=readme,
