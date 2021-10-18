@@ -2,6 +2,10 @@
 
 Library for running [label-maker](https://github.com/developmentseed/label-maker/) as a [dask](https://dask.org/) job
 
+# Acknowledgements
+
+This work was undertaken with support from Microsoft to be run on the [Planetary Computer](https://planetarycomputer.microsoft.com/). With access to the Planetary Computer Hub, you can find an interactive notebook tutorial for running this library.
+
 # Basic Example
 
 Instantiate a distributed dask cluster
