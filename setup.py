@@ -24,7 +24,7 @@ extra_reqs = {
 
 setup(
     name="label-maker-dask",
-    version="0.1.1",
+    version="0.1.2",
     python_requires=">=3.6",
     description="Run label maker as a dask job",
     long_description=readme,
