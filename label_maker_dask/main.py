@@ -41,7 +41,7 @@ def tile_to_label(tile: Tile, ml_type: str, classes: Dict, label_source: str):
         tile_data = mapbox_vector_tile.decode(r.content)
     except:
         """It is possible to get empty vector tile response."""
-        tile_data = None
+        tile_data = {}
     label = get_label(tile_data, classes, ml_type)
 
     return (tile, label)
